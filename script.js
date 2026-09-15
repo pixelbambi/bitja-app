@@ -43,10 +43,6 @@ const CAPTIONS = [
   {
     text: 'I have long thought that a proper gift for our children and grandchildren is an accurate record of all we know about the present and past environment.',
     attribution: '— James Lovelock, We Belong to Gaia'
-  },
-  {
-    text: 'Scan the shelves of a bookshop or a public library for a book that clearly explains the present condition and how it happened. You will not find it.',
-    attribution: '— James Lovelock, We Belong to Gaia'
   }
 ];
 
@@ -225,11 +221,11 @@ async function startCamera() {
     currentStream = null;
   }
   if (!window.isSecureContext) {
-    showError('Stran ni na HTTPS (ali localhost), zato brskalnik kamere ne dovoli. Odpri stran preko https:// ali preko localhost.', myRequest);
+    showError('This page isn’t on HTTPS (or localhost), so the browser won’t allow camera access. Open it via https:// or localhost.', myRequest);
     return;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showError('Ta brskalnik ne podpira dostopa do kamere (navigator.mediaDevices manjka). Poskusi v Safari ali Chrome, ne v vgrajenem brskalniku aplikacije.', myRequest);
+    showError('This browser doesn’t support camera access (navigator.mediaDevices is missing). Try Safari or Chrome instead of an app’s built-in browser.', myRequest);
     return;
   }
   try {
@@ -249,13 +245,13 @@ async function startCamera() {
   } catch (err) {
     console.error('Camera error:', err.name, err.message);
     const messages = {
-      NotAllowedError: 'Dostop do kamere je zavrnjen. Klikni na ključavnico/ikono ob naslovu strani, dovoli kamero, nato osveži.',
-      NotFoundError: 'Ni najdene kamere na tej napravi.',
-      NotReadableError: 'Kamero uporablja druga aplikacija ali zavihek — zapri jo in poskusi znova.',
-      OverconstrainedError: 'Zadnja kamera ni na voljo na tej napravi.',
-      SecurityError: 'Dostop do kamere je blokiran zaradi varnostnih nastavitev strani (npr. vgrajen predogled brez dovoljenja za kamero).'
+      NotAllowedError: 'Camera access was denied. Tap the lock/site icon next to the address bar, allow the camera, then refresh.',
+      NotFoundError: 'No camera was found on this device.',
+      NotReadableError: 'Another app or tab is using the camera — close it and try again.',
+      OverconstrainedError: 'The back camera isn’t available on this device.',
+      SecurityError: 'Camera access is blocked by this page’s security settings (e.g. an embedded preview without camera permission).'
     };
-    showError(messages[err.name] || `Napaka pri dostopu do kamere: ${err.name} — ${err.message}`, myRequest);
+    showError(messages[err.name] || `Camera error: ${err.name} — ${err.message}`, myRequest);
   }
 }
 
@@ -372,6 +368,20 @@ function compositeFrame(ctx, outW, outH, stageRect) {
   }
 }
 
+// Adds subtle monochrome film grain over the whole image — a one-off per-pixel pass,
+// fine for a single still but too slow to run every frame of a video recording.
+function applyFilmGrain(ctx, w, h, intensity) {
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * intensity;
+    data[i] = Math.min(255, Math.max(0, data[i] + noise));
+    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+    data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
 // Composite a single photo snapshot, then share or download it.
 function renderSnapshot() {
   const canvas = document.getElementById('capture-canvas');
@@ -380,6 +390,7 @@ function renderSnapshot() {
   canvas.width = outW;
   canvas.height = outH;
   compositeFrame(ctx, outW, outH, stageRect);
+  applyFilmGrain(ctx, outW, outH, 16);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 

@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="sl">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>bitja — spletni AR filter</title>
+<title>bitja — web AR filter</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -18,19 +18,20 @@
   <div id="creature-layer"></div>
 
   <div id="permission-msg" hidden>
-    <p>Za AR filter potrebujem dostop do kamere. Preveri dovoljenja brskalnika in osveži stran.</p>
-    <button id="retry-btn">Poskusi znova</button>
+    <p>This AR filter needs camera access. Check your browser's permissions and refresh the page.</p>
+    <button id="retry-btn">Try again</button>
   </div>
 
   <div id="caption"></div>
 
   <div id="controls">
-    <button id="save-btn" title="Tapni za fotko, pridrži za video">
+    <button id="save-btn" title="Tap for a photo, hold for a video">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
     </button>
+    <p id="controls-hint">Tap for photo · hold for video</p>
   </div>
 </div>
 
@@ -38,16 +39,16 @@
 <canvas id="record-canvas" hidden></canvas>
 
 <div id="preview-overlay" hidden>
-  <button id="preview-close" title="Zapri">✕</button>
-  <img id="preview-img" alt="Posneta fotka">
+  <button id="preview-close" title="Close">✕</button>
+  <img id="preview-img" alt="Captured photo">
   <video id="preview-video" hidden playsinline controls loop muted></video>
-  <p id="preview-hint">Pridrži sliko/video, da ga shraniš v galerijo</p>
+  <p id="preview-hint">Press and hold the image/video to save it to your gallery</p>
   <div id="preview-actions">
-    <button id="preview-share-ig">Deli na Instagram Story</button>
-    <button id="preview-download">Prenesi</button>
+    <button id="preview-share-ig">Share to Instagram Story</button>
+    <button id="preview-download">Download</button>
   </div>
 </div>
 
-<script src="script.js?v=4"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>
