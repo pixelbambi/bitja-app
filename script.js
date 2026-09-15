@@ -68,7 +68,9 @@ const SLOTS = [
 ];
 
 // Small / medium / large — shuffled across the 3 creatures each load so sizes vary.
-const SIZE_SCALES = [0.7, 0.92, 1.15];
+// Trimmed down from the original [0.7, 0.92, 1.15]: the largest size, plus the drift
+// margin below, was eating most of the draggable area, leaving very little room to move them.
+const SIZE_SCALES = [0.6, 0.8, 1.0];
 
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -143,8 +145,8 @@ function createCreature(fileSrc, slot, scale) {
   // Drift amplitude is computed before the clamp so the clamp can reserve room for it too —
   // otherwise the idle float could nudge a creature past the edge the clamp allowed for.
   const rect = canvas.getBoundingClientRect();
-  instance.driftAmpX = rect.width * 0.035;
-  instance.driftAmpY = rect.height * 0.05;
+  instance.driftAmpX = rect.width * 0.018;
+  instance.driftAmpY = rect.height * 0.025;
 
   instance.pos = clampToStage(instance, randomInSlot(slot));
   applyCreatureTransform(instance);
