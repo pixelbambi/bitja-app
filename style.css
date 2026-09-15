@@ -268,16 +268,11 @@ html, body {
   font-weight: 600;
 }
 
-#preview-share-ig {
+#preview-action {
   background: #fff;
   color: #111;
 }
 
-#preview-download {
-  background: rgba(255,255,255,0.15);
-  color: #fff;
-}
-
-#preview-share-ig:active, #preview-download:active {
+#preview-action:active {
   transform: scale(0.96);
 }

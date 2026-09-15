@@ -567,9 +567,10 @@ saveBtn.addEventListener('click', async () => {
 const previewOverlay = document.getElementById('preview-overlay');
 const previewImg = document.getElementById('preview-img');
 const previewVideo = document.getElementById('preview-video');
-const previewShareIgBtn = document.getElementById('preview-share-ig');
-const previewDownloadBtn = document.getElementById('preview-download');
+const previewActionBtn = document.getElementById('preview-action');
 const previewCloseBtn = document.getElementById('preview-close');
+
+let previewCanShare = false;
 
 let currentPreviewUrl = null;
 let currentPreviewBlob = null;
@@ -599,33 +600,33 @@ function showPreview(blob, kind) {
   }
   previewOverlay.hidden = false;
 
-  // Web pages can't silently write to the Photos/Gallery app — the real, reliable way to get
-  // there is the OS's own save gesture: long-press the image/video ("Save Image"/"Save Video").
-  // The share button is the other native route, where Instagram (and its Story composer) shows
-  // up as one of the OS share-sheet options — a site can't skip straight into it, only a native app can.
-  const canNativeShare = !!(navigator.canShare && navigator.canShare({ files: [blob] }));
-  previewShareIgBtn.hidden = !canNativeShare;
+  // Web pages can't silently write to the Photos/Gallery app — the two real routes are the
+  // OS's own save gesture (long-press the image/video → "Save Image"/"Save Video") and the
+  // share sheet, which itself offers "Save Image" as one of its options on iOS/Android. So a
+  // single Share button already covers saving-to-gallery, not just sending it to another app.
+  previewCanShare = !!(navigator.canShare && navigator.canShare({ files: [blob] }));
+  previewActionBtn.textContent = previewCanShare ? 'Share' : 'Download';
 }
 
 previewCloseBtn.addEventListener('click', closePreview);
 
-previewShareIgBtn.addEventListener('click', async () => {
+previewActionBtn.addEventListener('click', async () => {
   if (!currentPreviewBlob) return;
   const isVideo = currentPreviewBlob.type.startsWith('video');
   const ext = isVideo ? (currentPreviewBlob.type.includes('mp4') ? 'mp4' : 'webm') : 'png';
-  const file = new File([currentPreviewBlob], `bitje-${Date.now()}.${ext}`, { type: currentPreviewBlob.type });
-  try {
-    await navigator.share({ files: [file] });
-  } catch (err) {
-    if (err.name !== 'AbortError') downloadBlob(currentPreviewBlob, file.name);
-  }
-});
+  const filename = `bitje-${Date.now()}.${ext}`;
 
-previewDownloadBtn.addEventListener('click', () => {
-  if (!currentPreviewBlob) return;
-  const isVideo = currentPreviewBlob.type.startsWith('video');
-  const ext = isVideo ? (currentPreviewBlob.type.includes('mp4') ? 'mp4' : 'webm') : 'png';
-  downloadBlob(currentPreviewBlob, `bitje-${Date.now()}.${ext}`);
+  if (previewCanShare) {
+    const file = new File([currentPreviewBlob], filename, { type: currentPreviewBlob.type });
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // user cancelled the share sheet
+      // fall through to download on any other failure
+    }
+  }
+  downloadBlob(currentPreviewBlob, filename);
 });
 
 initCreatures();
