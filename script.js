@@ -567,13 +567,18 @@ saveBtn.addEventListener('click', async () => {
 const previewOverlay = document.getElementById('preview-overlay');
 const previewImg = document.getElementById('preview-img');
 const previewVideo = document.getElementById('preview-video');
-const previewActionBtn = document.getElementById('preview-action');
+const previewShareBtn = document.getElementById('preview-share');
+const previewSaveBtn = document.getElementById('preview-save');
 const previewCloseBtn = document.getElementById('preview-close');
-
-let previewCanShare = false;
 
 let currentPreviewUrl = null;
 let currentPreviewBlob = null;
+
+function previewFilename(blob) {
+  const isVideo = blob.type.startsWith('video');
+  const ext = isVideo ? (blob.type.includes('mp4') ? 'mp4' : 'webm') : 'png';
+  return `bitje-${Date.now()}.${ext}`;
+}
 
 function closePreview() {
   previewOverlay.hidden = true;
@@ -600,33 +605,32 @@ function showPreview(blob, kind) {
   }
   previewOverlay.hidden = false;
 
-  // Web pages can't silently write to the Photos/Gallery app — the two real routes are the
-  // OS's own save gesture (long-press the image/video → "Save Image"/"Save Video") and the
-  // share sheet, which itself offers "Save Image" as one of its options on iOS/Android. So a
-  // single Share button already covers saving-to-gallery, not just sending it to another app.
-  previewCanShare = !!(navigator.canShare && navigator.canShare({ files: [blob] }));
-  previewActionBtn.textContent = previewCanShare ? 'Share' : 'Download';
+  // Share opens the OS share sheet (Instagram, Messages, AirDrop, …); hide it entirely
+  // where the API isn't supported (most desktop browsers) rather than show a dead button.
+  const canNativeShare = !!(navigator.canShare && navigator.canShare({ files: [blob] }));
+  previewShareBtn.hidden = !canNativeShare;
 }
 
 previewCloseBtn.addEventListener('click', closePreview);
 
-previewActionBtn.addEventListener('click', async () => {
+previewShareBtn.addEventListener('click', async () => {
   if (!currentPreviewBlob) return;
-  const isVideo = currentPreviewBlob.type.startsWith('video');
-  const ext = isVideo ? (currentPreviewBlob.type.includes('mp4') ? 'mp4' : 'webm') : 'png';
-  const filename = `bitje-${Date.now()}.${ext}`;
-
-  if (previewCanShare) {
-    const file = new File([currentPreviewBlob], filename, { type: currentPreviewBlob.type });
-    try {
-      await navigator.share({ files: [file] });
-      return;
-    } catch (err) {
-      if (err.name === 'AbortError') return; // user cancelled the share sheet
-      // fall through to download on any other failure
-    }
+  const file = new File([currentPreviewBlob], previewFilename(currentPreviewBlob), { type: currentPreviewBlob.type });
+  try {
+    await navigator.share({ files: [file] });
+  } catch (err) {
+    if (err.name !== 'AbortError') downloadBlob(currentPreviewBlob, file.name);
   }
-  downloadBlob(currentPreviewBlob, filename);
+});
+
+// Save triggers the browser's own download mechanism — the closest a website can get to
+// "save to gallery" without a user picking it from a share sheet or long-pressing themselves.
+// What it actually does depends on the OS: Android commonly indexes a downloaded image straight
+// into the gallery; iOS Safari puts it in the Files app instead of Photos, since iOS doesn't
+// let any website write to Photos directly — that's an OS restriction, not a site-specific gap.
+previewSaveBtn.addEventListener('click', () => {
+  if (!currentPreviewBlob) return;
+  downloadBlob(currentPreviewBlob, previewFilename(currentPreviewBlob));
 });
 
 initCreatures();

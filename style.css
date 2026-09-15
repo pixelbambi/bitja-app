@@ -268,11 +268,16 @@ html, body {
   font-weight: 600;
 }
 
-#preview-action {
+#preview-share {
   background: #fff;
   color: #111;
 }
 
-#preview-action:active {
+#preview-save {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+#preview-share:active, #preview-save:active {
   transform: scale(0.96);
 }
