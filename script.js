@@ -121,14 +121,30 @@ function createCreature(fileSrc, slot) {
     ctx: canvas.getContext('2d', { willReadFrequently: true }),
     sourceVideo,
     keyBufferCtx: keyBuffer.getContext('2d'),
-    pos: randomInSlot(slot),
+    pos: { xPct: 50, yPct: 50 }, // placeholder — real (clamped) position set below, once sized
     dragging: false,
     dragOffset: { x: 0, y: 0 }
   };
 
+  // The canvas has real layout dimensions as soon as it's in the DOM (its size comes from
+  // CSS relative to the viewport, independent of left/top), so it's safe to measure now.
+  instance.pos = clampToStage(instance, randomInSlot(slot));
   applyCreatureTransform(instance);
   bindDrag(instance);
   creatures.push(instance);
+}
+
+// Keeps a creature's full bounding box inside the stage — clamps the CENTER point so that
+// center ± half-size never crosses an edge, using the creature's actual on-screen size.
+function clampToStage(instance, pos) {
+  const stageRect = stage.getBoundingClientRect();
+  const creatureRect = instance.canvas.getBoundingClientRect();
+  const halfXPct = (creatureRect.width / stageRect.width) * 50;
+  const halfYPct = (creatureRect.height / stageRect.height) * 50;
+  return {
+    xPct: Math.min(100 - halfXPct, Math.max(halfXPct, pos.xPct)),
+    yPct: Math.min(100 - halfYPct, Math.max(halfYPct, pos.yPct))
+  };
 }
 
 function applyCreatureTransform(instance) {
@@ -154,8 +170,8 @@ function bindDrag(instance) {
     const rect = stage.getBoundingClientRect();
     const x = e.clientX - rect.left - instance.dragOffset.x;
     const y = e.clientY - rect.top - instance.dragOffset.y;
-    instance.pos.xPct = Math.min(100, Math.max(0, (x / rect.width) * 100));
-    instance.pos.yPct = Math.min(100, Math.max(0, (y / rect.height) * 100));
+    const raw = { xPct: (x / rect.width) * 100, yPct: (y / rect.height) * 100 };
+    instance.pos = clampToStage(instance, raw);
     applyCreatureTransform(instance);
   });
 
