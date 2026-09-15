@@ -17,6 +17,14 @@ const CREATURE_FILES = [
 
 const CAPTIONS = [
   {
+    text: 'Hello there earthling! You have stumbled upon our garden of Moss.\nRejoyce amidst the harmony of green.',
+    attribution: ''
+  },
+  {
+    text: 'Moss is an inconspicuous plant that might bridge the connection between the binding forces lying within our biology and our relationships to other organisms.',
+    attribution: ''
+  },
+  {
     text: 'An artwork does something to you, so if you think that only lifeforms can do things to you, this is a weird and challenging fact. If you think on top of this that only humans are empowered with the magical ability to impose meaning and temporality on things, then you are in for a bigger shock, because as I’ve argued, art emits time, which tells you something about how everything emits time.',
     attribution: '— Timothy Morton, All Art is Ecological'
   },
@@ -172,11 +180,13 @@ function initCreatures() {
   const textEl = document.createElement('p');
   textEl.className = 'quote-text';
   textEl.textContent = currentQuote.text;
-  const attributionEl = document.createElement('p');
-  attributionEl.className = 'quote-attribution';
-  attributionEl.textContent = currentQuote.attribution;
   captionEl.appendChild(textEl);
-  captionEl.appendChild(attributionEl);
+  if (currentQuote.attribution) {
+    const attributionEl = document.createElement('p');
+    attributionEl.className = 'quote-attribution';
+    attributionEl.textContent = currentQuote.attribution;
+    captionEl.appendChild(attributionEl);
+  }
 }
 
 function chromaKeyLoop() {
@@ -274,22 +284,20 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-// Composite the camera frame + all creatures + the quote into one vertical snapshot
-// that matches what's actually on screen, then share or download it.
-function renderSnapshot() {
-  const canvas = document.getElementById('capture-canvas');
-  const ctx = canvas.getContext('2d');
-
-  // Output canvas matches the on-screen (portrait) aspect ratio — not the camera
-  // sensor's native aspect, which is often landscape and would otherwise squish/crop wrong.
+// Figures out the output size that matches the on-screen (portrait) aspect ratio —
+// not the camera sensor's native aspect, which is often landscape and would otherwise squish/crop wrong.
+function getOutputSize() {
   const stageRect = stage.getBoundingClientRect();
   const aspect = stageRect.height / stageRect.width;
   const outW = 1080;
   const outH = Math.round(outW * aspect);
-  canvas.width = outW;
-  canvas.height = outH;
+  return { outW, outH, stageRect };
+}
 
-  // Crop the video frame the same way CSS object-fit:cover does, so the photo matches the live view.
+// Draws one composited frame (camera + creatures + quote) into ctx at outW x outH.
+// Used both for a single photo snapshot and, repeatedly, for video recording.
+function compositeFrame(ctx, outW, outH, stageRect) {
+  // Crop the video frame the same way CSS object-fit:cover does, so it matches the live view.
   const vw = video.videoWidth || outW;
   const vh = video.videoHeight || outH;
   const videoAspect = vw / vh;
@@ -321,15 +329,15 @@ function renderSnapshot() {
     ctx.drawImage(instance.canvas, drawX, drawY, drawW, drawH);
   }
 
-  // Bake the quote into the image, bottom-anchored over a dark scrim for legibility.
+  // Bake the quote in, bottom-anchored over a dark scrim for legibility.
   if (currentQuote) {
     const pad = outW * 0.08;
     const maxTextWidth = outW - pad * 2;
     const quoteFontSize = Math.round(outW * 0.034);
     const quoteLineHeight = Math.round(quoteFontSize * 1.5);
     const attrFontSize = Math.round(outW * 0.026);
-    const attrLineHeight = Math.round(attrFontSize * 1.4);
-    const fontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const attrLineHeight = currentQuote.attribution ? Math.round(attrFontSize * 1.4) : 0;
+    const fontStack = "'Fraunces', Georgia, 'Times New Roman', serif";
 
     ctx.font = `500 ${quoteFontSize}px ${fontStack}`;
     const lines = wrapText(ctx, currentQuote.text, maxTextWidth);
@@ -354,30 +362,135 @@ function renderSnapshot() {
       y += quoteLineHeight;
     }
 
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = `italic ${attrFontSize}px ${fontStack}`;
-    ctx.fillText(currentQuote.attribution, outW / 2, outH - pad);
+    if (currentQuote.attribution) {
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = `italic ${attrFontSize}px ${fontStack}`;
+      ctx.fillText(currentQuote.attribution, outW / 2, outH - pad);
+    }
 
     ctx.shadowBlur = 0;
   }
+}
 
+// Composite a single photo snapshot, then share or download it.
+function renderSnapshot() {
+  const canvas = document.getElementById('capture-canvas');
+  const ctx = canvas.getContext('2d');
+  const { outW, outH, stageRect } = getOutputSize();
+  canvas.width = outW;
+  canvas.height = outH;
+  compositeFrame(ctx, outW, outH, stageRect);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
-function downloadBlob(blob) {
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `bitje-${Date.now()}.png`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
 }
 
+function pickRecorderMimeType() {
+  if (!window.MediaRecorder) return '';
+  const candidates = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  for (const type of candidates) {
+    if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return '';
+}
+
+const canRecord = !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
+const MAX_RECORD_MS = 12000;
+const HOLD_THRESHOLD_MS = 350;
+
+let holdTimer = null;
+let mediaRecorder = null;
+let recordChunks = [];
+let recordLoopId = null;
+let maxDurationTimer = null;
+
+function startRecording() {
+  const { outW, outH, stageRect } = getOutputSize();
+  const recordCanvas = document.getElementById('record-canvas');
+  recordCanvas.width = outW;
+  recordCanvas.height = outH;
+  const ctx = recordCanvas.getContext('2d');
+
+  function drawLoop() {
+    compositeFrame(ctx, outW, outH, stageRect);
+    recordLoopId = requestAnimationFrame(drawLoop);
+  }
+  drawLoop();
+
+  const mimeType = pickRecorderMimeType();
+  const stream = recordCanvas.captureStream(30);
+  recordChunks = [];
+  mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size) recordChunks.push(e.data);
+  };
+  mediaRecorder.onstop = () => {
+    cancelAnimationFrame(recordLoopId);
+    const type = mediaRecorder.mimeType || mimeType || 'video/webm';
+    const blob = new Blob(recordChunks, { type });
+    showPreview(blob, 'video');
+  };
+  mediaRecorder.start();
+  saveBtn.classList.add('recording');
+  maxDurationTimer = setTimeout(stopRecording, MAX_RECORD_MS);
+}
+
+function stopRecording() {
+  clearTimeout(maxDurationTimer);
+  saveBtn.classList.remove('recording');
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+}
+
+let isHoldRecording = false; // true once a recording has actually started for the current press
+
+saveBtn.addEventListener('pointerdown', () => {
+  isHoldRecording = false;
+  if (!canRecord) return; // no hold-to-record support — plain tap-for-photo still works via click below
+  holdTimer = setTimeout(() => {
+    holdTimer = null;
+    isHoldRecording = true;
+    startRecording();
+  }, HOLD_THRESHOLD_MS);
+});
+
+['pointerup', 'pointercancel', 'pointerleave'].forEach((evt) => {
+  saveBtn.addEventListener(evt, () => {
+    if (holdTimer) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+    if (isHoldRecording) {
+      stopRecording();
+    }
+  });
+});
+
+saveBtn.addEventListener('click', async () => {
+  // A hold that started a recording already has its own stop/preview path (above) —
+  // don't also take a photo for the same press.
+  if (isHoldRecording) {
+    isHoldRecording = false;
+    return;
+  }
+  const blob = await renderSnapshot();
+  showPreview(blob, 'image');
+});
+
 const previewOverlay = document.getElementById('preview-overlay');
 const previewImg = document.getElementById('preview-img');
-const previewShareBtn = document.getElementById('preview-share');
+const previewVideo = document.getElementById('preview-video');
+const previewShareIgBtn = document.getElementById('preview-share-ig');
 const previewDownloadBtn = document.getElementById('preview-download');
 const previewCloseBtn = document.getElementById('preview-close');
 
@@ -386,42 +499,56 @@ let currentPreviewBlob = null;
 
 function closePreview() {
   previewOverlay.hidden = true;
+  previewVideo.pause();
   if (currentPreviewUrl) {
     URL.revokeObjectURL(currentPreviewUrl);
     currentPreviewUrl = null;
   }
 }
 
-saveBtn.addEventListener('click', async () => {
-  const blob = await renderSnapshot();
+function showPreview(blob, kind) {
   currentPreviewBlob = blob;
+  if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
   currentPreviewUrl = URL.createObjectURL(blob);
-  previewImg.src = currentPreviewUrl;
+
+  if (kind === 'video') {
+    previewVideo.src = currentPreviewUrl;
+    previewVideo.hidden = false;
+    previewImg.hidden = true;
+  } else {
+    previewImg.src = currentPreviewUrl;
+    previewImg.hidden = false;
+    previewVideo.hidden = true;
+  }
   previewOverlay.hidden = false;
 
   // Web pages can't silently write to the Photos/Gallery app — the real, reliable way to get
-  // there is the OS's own image-saving gesture: long-press the <img> ("Save Image"/"Add to Photos").
-  // The share button is the other native route (Instagram Stories, Messages, AirDrop, …).
-  const canNativeShare = !!(navigator.canShare && navigator.canShare({
-    files: [new File([blob], 'bitje.png', { type: 'image/png' })]
-  }));
-  previewShareBtn.hidden = !canNativeShare;
-});
+  // there is the OS's own save gesture: long-press the image/video ("Save Image"/"Save Video").
+  // The share button is the other native route, where Instagram (and its Story composer) shows
+  // up as one of the OS share-sheet options — a site can't skip straight into it, only a native app can.
+  const canNativeShare = !!(navigator.canShare && navigator.canShare({ files: [blob] }));
+  previewShareIgBtn.hidden = !canNativeShare;
+}
 
 previewCloseBtn.addEventListener('click', closePreview);
 
-previewShareBtn.addEventListener('click', async () => {
+previewShareIgBtn.addEventListener('click', async () => {
   if (!currentPreviewBlob) return;
-  const file = new File([currentPreviewBlob], `bitje-${Date.now()}.png`, { type: 'image/png' });
+  const isVideo = currentPreviewBlob.type.startsWith('video');
+  const ext = isVideo ? (currentPreviewBlob.type.includes('mp4') ? 'mp4' : 'webm') : 'png';
+  const file = new File([currentPreviewBlob], `bitje-${Date.now()}.${ext}`, { type: currentPreviewBlob.type });
   try {
     await navigator.share({ files: [file] });
   } catch (err) {
-    if (err.name !== 'AbortError') downloadBlob(currentPreviewBlob);
+    if (err.name !== 'AbortError') downloadBlob(currentPreviewBlob, file.name);
   }
 });
 
 previewDownloadBtn.addEventListener('click', () => {
-  if (currentPreviewBlob) downloadBlob(currentPreviewBlob);
+  if (!currentPreviewBlob) return;
+  const isVideo = currentPreviewBlob.type.startsWith('video');
+  const ext = isVideo ? (currentPreviewBlob.type.includes('mp4') ? 'mp4' : 'webm') : 'png';
+  downloadBlob(currentPreviewBlob, `bitje-${Date.now()}.${ext}`);
 });
 
 initCreatures();
