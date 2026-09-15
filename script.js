@@ -59,12 +59,16 @@ const KEY_LOW = 14;
 const KEY_HIGH = 46;
 
 // Rough non-overlapping "slots" (% of stage) creatures get randomly jittered within.
-// Spread wide since creatures are large — keeps clear of the caption band at the bottom.
+// Spread wide since creatures are large — clampToStage() below is what actually
+// guarantees they stay clear of the caption band, these are just a starting bias.
 const SLOTS = [
-  { xMin: 8, xMax: 28, yMin: 16, yMax: 30 },
-  { xMin: 72, xMax: 92, yMin: 16, yMax: 30 },
-  { xMin: 35, xMax: 65, yMin: 55, yMax: 68 }
+  { xMin: 8, xMax: 28, yMin: 12, yMax: 26 },
+  { xMin: 72, xMax: 92, yMin: 12, yMax: 26 },
+  { xMin: 35, xMax: 65, yMin: 30, yMax: 46 }
 ];
+
+// Small / medium / large — shuffled across the 3 creatures each load so sizes vary.
+const SIZE_SCALES = [0.7, 0.92, 1.15];
 
 function pickRandom(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -89,9 +93,10 @@ function randomInSlot(slot) {
 // One entry per on-screen creature: its canvas, hidden source video, offscreen key buffer, and position.
 const creatures = [];
 
-function createCreature(fileSrc, slot) {
+function createCreature(fileSrc, slot, scale) {
   const canvas = document.createElement('canvas');
   canvas.className = 'creature';
+  canvas.style.setProperty('--scale', scale);
   canvas.width = KEY_W;
   canvas.height = KEY_H;
   creatureLayer.appendChild(canvas);
@@ -123,27 +128,56 @@ function createCreature(fileSrc, slot) {
     keyBufferCtx: keyBuffer.getContext('2d'),
     pos: { xPct: 50, yPct: 50 }, // placeholder — real (clamped) position set below, once sized
     dragging: false,
-    dragOffset: { x: 0, y: 0 }
+    dragOffset: { x: 0, y: 0 },
+    // Gentle idle drift — random phase/speed per creature so they float out of sync with each other.
+    driftPhaseX: Math.random() * Math.PI * 2,
+    driftPhaseY: Math.random() * Math.PI * 2,
+    driftFreqX: 0.35 + Math.random() * 0.25,
+    driftFreqY: 0.28 + Math.random() * 0.25,
+    driftAmpX: 0,
+    driftAmpY: 0
   };
 
   // The canvas has real layout dimensions as soon as it's in the DOM (its size comes from
   // CSS relative to the viewport, independent of left/top), so it's safe to measure now.
+  // Drift amplitude is computed before the clamp so the clamp can reserve room for it too —
+  // otherwise the idle float could nudge a creature past the edge the clamp allowed for.
+  const rect = canvas.getBoundingClientRect();
+  instance.driftAmpX = rect.width * 0.035;
+  instance.driftAmpY = rect.height * 0.05;
+
   instance.pos = clampToStage(instance, randomInSlot(slot));
   applyCreatureTransform(instance);
   bindDrag(instance);
   creatures.push(instance);
 }
 
-// Keeps a creature's full bounding box inside the stage — clamps the CENTER point so that
-// center ± half-size never crosses an edge, using the creature's actual on-screen size.
+// Top edge of the no-go zone above the caption (in % of stage height), with a small margin —
+// creatures are kept fully clear of it, not just visually on top of it.
+function getCaptionAvoidTopPct(stageRect) {
+  if (!captionEl.textContent) return 100;
+  const capRect = captionEl.getBoundingClientRect();
+  const marginPx = 14;
+  return ((capRect.top - marginPx - stageRect.top) / stageRect.height) * 100;
+}
+
+// Keeps a creature's full bounding box inside the stage AND above the caption's no-go zone —
+// clamps the CENTER point using the creature's actual on-screen size, plus its idle-drift
+// amplitude (the floating wobble can otherwise nudge it past a margin sized for the static box alone).
 function clampToStage(instance, pos) {
   const stageRect = stage.getBoundingClientRect();
   const creatureRect = instance.canvas.getBoundingClientRect();
-  const halfXPct = (creatureRect.width / stageRect.width) * 50;
-  const halfYPct = (creatureRect.height / stageRect.height) * 50;
+  const marginXPct = ((creatureRect.width / 2 + instance.driftAmpX) / stageRect.width) * 100;
+  const marginYPct = ((creatureRect.height / 2 + instance.driftAmpY) / stageRect.height) * 100;
+
+  const captionTopPct = getCaptionAvoidTopPct(stageRect);
+  // Normally the lower bound on center-Y is the stage bottom edge; never let it dip into
+  // the caption zone either — but never push it above the stage's own top edge as a result.
+  const yUpperBound = Math.max(marginYPct, Math.min(100 - marginYPct, captionTopPct - marginYPct));
+
   return {
-    xPct: Math.min(100 - halfXPct, Math.max(halfXPct, pos.xPct)),
-    yPct: Math.min(100 - halfYPct, Math.max(halfYPct, pos.yPct))
+    xPct: Math.min(100 - marginXPct, Math.max(marginXPct, pos.xPct)),
+    yPct: Math.min(yUpperBound, Math.max(marginYPct, pos.yPct))
   };
 }
 
@@ -152,11 +186,20 @@ function applyCreatureTransform(instance) {
   instance.canvas.style.top = instance.pos.yPct + '%';
 }
 
+// The idle float — layered on top of the base left/top position every frame.
+function applyDrift(instance, t) {
+  if (instance.dragging) return;
+  const dx = Math.sin(t * instance.driftFreqX + instance.driftPhaseX) * instance.driftAmpX;
+  const dy = Math.sin(t * instance.driftFreqY + instance.driftPhaseY) * instance.driftAmpY;
+  instance.canvas.style.transform = `translate(-50%, -50%) translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+}
+
 function bindDrag(instance) {
   const { canvas } = instance;
 
   canvas.addEventListener('pointerdown', (e) => {
     instance.dragging = true;
+    canvas.style.transform = 'translate(-50%, -50%)'; // clear any residual drift offset so drag math lines up
     canvas.setPointerCapture(e.pointerId);
     const rect = stage.getBoundingClientRect();
     const creatureX = (instance.pos.xPct / 100) * rect.width;
@@ -184,9 +227,8 @@ function bindDrag(instance) {
 let currentQuote = null;
 
 function initCreatures() {
-  const files = shuffled(CREATURE_FILES).slice(0, CREATURE_COUNT);
-  files.forEach((file, i) => createCreature(file, SLOTS[i]));
-
+  // Caption goes in first so its real layout size exists before creatures are placed —
+  // clampToStage() reads the caption's bounding box to keep creatures off of it.
   currentQuote = pickRandom(CAPTIONS);
   captionEl.innerHTML = '';
   const textEl = document.createElement('p');
@@ -199,10 +241,16 @@ function initCreatures() {
     attributionEl.textContent = currentQuote.attribution;
     captionEl.appendChild(attributionEl);
   }
+
+  const files = shuffled(CREATURE_FILES).slice(0, CREATURE_COUNT);
+  const scales = shuffled(SIZE_SCALES);
+  files.forEach((file, i) => createCreature(file, SLOTS[i], scales[i]));
 }
 
 function chromaKeyLoop() {
+  const t = performance.now() / 1000;
   for (const instance of creatures) {
+    applyDrift(instance, t);
     if (instance.sourceVideo.readyState >= 2) {
       instance.keyBufferCtx.drawImage(instance.sourceVideo, 0, 0, KEY_W, KEY_H);
       const frame = instance.keyBufferCtx.getImageData(0, 0, KEY_W, KEY_H);

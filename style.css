@@ -37,8 +37,9 @@ html, body {
 
 .creature {
   position: absolute;
-  /* scales with the viewport so it reads at the same relative size on any screen */
-  width: min(58vw, 50vh);
+  /* scales with the viewport so it reads at the same relative size on any screen;
+     --scale varies per instance in JS so creatures come in different sizes */
+  width: calc(var(--scale, 1) * min(58vw, 50vh));
   height: auto;
   transform: translate(-50%, -50%);
   cursor: grab;
