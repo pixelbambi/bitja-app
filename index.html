@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>bitja — spletni AR filter</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -33,6 +33,16 @@
 
 <canvas id="capture-canvas" hidden></canvas>
 
-<script src="script.js?v=2"></script>
+<div id="preview-overlay" hidden>
+  <button id="preview-close" title="Zapri">✕</button>
+  <img id="preview-img" alt="Posneta fotka">
+  <p id="preview-hint">Pridrži sliko, da jo shraniš v galerijo</p>
+  <div id="preview-actions">
+    <button id="preview-share">Deli</button>
+    <button id="preview-download">Prenesi</button>
+  </div>
+</div>
+
+<script src="script.js?v=3"></script>
 </body>
 </html>

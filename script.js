@@ -375,22 +375,53 @@ function downloadBlob(blob) {
   URL.revokeObjectURL(url);
 }
 
+const previewOverlay = document.getElementById('preview-overlay');
+const previewImg = document.getElementById('preview-img');
+const previewShareBtn = document.getElementById('preview-share');
+const previewDownloadBtn = document.getElementById('preview-download');
+const previewCloseBtn = document.getElementById('preview-close');
+
+let currentPreviewUrl = null;
+let currentPreviewBlob = null;
+
+function closePreview() {
+  previewOverlay.hidden = true;
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = null;
+  }
+}
+
 saveBtn.addEventListener('click', async () => {
   const blob = await renderSnapshot();
-  const file = new File([blob], `bitje-${Date.now()}.png`, { type: 'image/png' });
+  currentPreviewBlob = blob;
+  currentPreviewUrl = URL.createObjectURL(blob);
+  previewImg.src = currentPreviewUrl;
+  previewOverlay.hidden = false;
 
-  // Prefer the native share sheet (Instagram Stories, Messages, AirDrop, …) where supported;
-  // fall back to a plain download everywhere else (most desktop browsers).
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file] });
-      return;
-    } catch (err) {
-      if (err.name === 'AbortError') return; // user cancelled the share sheet
-      // fall through to download on any other failure
-    }
+  // Web pages can't silently write to the Photos/Gallery app — the real, reliable way to get
+  // there is the OS's own image-saving gesture: long-press the <img> ("Save Image"/"Add to Photos").
+  // The share button is the other native route (Instagram Stories, Messages, AirDrop, …).
+  const canNativeShare = !!(navigator.canShare && navigator.canShare({
+    files: [new File([blob], 'bitje.png', { type: 'image/png' })]
+  }));
+  previewShareBtn.hidden = !canNativeShare;
+});
+
+previewCloseBtn.addEventListener('click', closePreview);
+
+previewShareBtn.addEventListener('click', async () => {
+  if (!currentPreviewBlob) return;
+  const file = new File([currentPreviewBlob], `bitje-${Date.now()}.png`, { type: 'image/png' });
+  try {
+    await navigator.share({ files: [file] });
+  } catch (err) {
+    if (err.name !== 'AbortError') downloadBlob(currentPreviewBlob);
   }
-  downloadBlob(blob);
+});
+
+previewDownloadBtn.addEventListener('click', () => {
+  if (currentPreviewBlob) downloadBlob(currentPreviewBlob);
 });
 
 initCreatures();
