@@ -17,11 +17,7 @@ const CREATURE_FILES = [
 
 const CAPTIONS = [
   {
-    text: 'You don’t ever exhaust the meaning of a poem or a painting or a piece of music, and this is another way of saying that the artwork is a sort of gate through which you can glimpse the unconditioned futurality that is a possibility condition for predictable futures. Art is maybe one tiny corner in our highly (too highly) consciously designed – and way too utilitarian – social space where we allow things to do that to us. What would it look like if we allowed more and more things to have some kind of power over us? This isn’t quite the same thing as saying, along with the socialist William Morris, that functional things should be beautiful. That’s because, on this view, things are just lumps without some nice decoration. But we’re saying that there are no lumps. There are blocks of ice, humans, sunlight, the Panthéon, polar bears. The goal is not to take existing things such as sofas and houses and make them pretty in a way that working-class people can afford (for example). That kind of thing suffers from the same syndrome as sustainability: it’s anthropocentrically scaled.',
-    attribution: '— Timothy Morton, All Art is Ecological'
-  },
-  {
-    text: 'An artwork does something to you, so if you think that only lifeforms can do things to you, this is a weird and challenging fact. If you think on top of this that only humans are empowered with the magical ability to impose meaning and temporality on things, then you are in for a bigger shock, because as I’ve argued, art emits time, which tells you something about how everything emits time. It’s designing your future as much as you’re designing its.',
+    text: 'An artwork does something to you, so if you think that only lifeforms can do things to you, this is a weird and challenging fact. If you think on top of this that only humans are empowered with the magical ability to impose meaning and temporality on things, then you are in for a bigger shock, because as I’ve argued, art emits time, which tells you something about how everything emits time.',
     attribution: '— Timothy Morton, All Art is Ecological'
   },
   {
@@ -165,18 +161,20 @@ function bindDrag(instance) {
   });
 }
 
+let currentQuote = null;
+
 function initCreatures() {
   const files = shuffled(CREATURE_FILES).slice(0, CREATURE_COUNT);
   files.forEach((file, i) => createCreature(file, SLOTS[i]));
 
-  const quote = pickRandom(CAPTIONS);
+  currentQuote = pickRandom(CAPTIONS);
   captionEl.innerHTML = '';
   const textEl = document.createElement('p');
   textEl.className = 'quote-text';
-  textEl.textContent = quote.text;
+  textEl.textContent = currentQuote.text;
   const attributionEl = document.createElement('p');
   attributionEl.className = 'quote-attribution';
-  attributionEl.textContent = quote.attribution;
+  attributionEl.textContent = currentQuote.attribution;
   captionEl.appendChild(textEl);
   captionEl.appendChild(attributionEl);
 }
@@ -259,21 +257,60 @@ function showError(text, forRequest) {
 
 document.getElementById('retry-btn').addEventListener('click', startCamera);
 
-// Composite the camera frame + all creatures into one snapshot, then share or download it
+function wrapText(ctx, text, maxWidth) {
+  const words = text.split(/\s+/);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? line + ' ' + word : word;
+    if (line && ctx.measureText(test).width > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// Composite the camera frame + all creatures + the quote into one vertical snapshot
+// that matches what's actually on screen, then share or download it.
 function renderSnapshot() {
   const canvas = document.getElementById('capture-canvas');
-  const vw = video.videoWidth || 720;
-  const vh = video.videoHeight || 1280;
-  canvas.width = vw;
-  canvas.height = vh;
   const ctx = canvas.getContext('2d');
 
-  ctx.drawImage(video, 0, 0, vw, vh);
+  // Output canvas matches the on-screen (portrait) aspect ratio — not the camera
+  // sensor's native aspect, which is often landscape and would otherwise squish/crop wrong.
+  const stageRect = stage.getBoundingClientRect();
+  const aspect = stageRect.height / stageRect.width;
+  const outW = 1080;
+  const outH = Math.round(outW * aspect);
+  canvas.width = outW;
+  canvas.height = outH;
+
+  // Crop the video frame the same way CSS object-fit:cover does, so the photo matches the live view.
+  const vw = video.videoWidth || outW;
+  const vh = video.videoHeight || outH;
+  const videoAspect = vw / vh;
+  const canvasAspect = outW / outH;
+  let sx, sy, sw, sh;
+  if (videoAspect > canvasAspect) {
+    sh = vh;
+    sw = vh * canvasAspect;
+    sx = (vw - sw) / 2;
+    sy = 0;
+  } else {
+    sw = vw;
+    sh = vw / canvasAspect;
+    sx = 0;
+    sy = (vh - sh) / 2;
+  }
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
 
   // Map each creature's on-screen position/size (relative to stage) onto the output canvas
-  const stageRect = stage.getBoundingClientRect();
-  const scaleX = vw / stageRect.width;
-  const scaleY = vh / stageRect.height;
+  const scaleX = outW / stageRect.width;
+  const scaleY = outH / stageRect.height;
 
   for (const instance of creatures) {
     const creatureRect = instance.canvas.getBoundingClientRect();
@@ -282,6 +319,46 @@ function renderSnapshot() {
     const drawX = (creatureRect.left - stageRect.left) * scaleX;
     const drawY = (creatureRect.top - stageRect.top) * scaleY;
     ctx.drawImage(instance.canvas, drawX, drawY, drawW, drawH);
+  }
+
+  // Bake the quote into the image, bottom-anchored over a dark scrim for legibility.
+  if (currentQuote) {
+    const pad = outW * 0.08;
+    const maxTextWidth = outW - pad * 2;
+    const quoteFontSize = Math.round(outW * 0.034);
+    const quoteLineHeight = Math.round(quoteFontSize * 1.5);
+    const attrFontSize = Math.round(outW * 0.026);
+    const attrLineHeight = Math.round(attrFontSize * 1.4);
+    const fontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+    ctx.font = `500 ${quoteFontSize}px ${fontStack}`;
+    const lines = wrapText(ctx, currentQuote.text, maxTextWidth);
+
+    const blockHeight = lines.length * quoteLineHeight + attrLineHeight + pad * 1.4;
+    const scrimHeight = Math.min(outH * 0.55, blockHeight + pad);
+    const grad = ctx.createLinearGradient(0, outH - scrimHeight, 0, outH);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, outH - scrimHeight, outW, scrimHeight);
+
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur = outW * 0.01;
+
+    let y = outH - pad - attrLineHeight - (lines.length - 1) * quoteLineHeight;
+    ctx.fillStyle = '#fff';
+    ctx.font = `500 ${quoteFontSize}px ${fontStack}`;
+    for (const line of lines) {
+      ctx.fillText(line, outW / 2, y);
+      y += quoteLineHeight;
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.font = `italic ${attrFontSize}px ${fontStack}`;
+    ctx.fillText(currentQuote.attribution, outW / 2, outH - pad);
+
+    ctx.shadowBlur = 0;
   }
 
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
