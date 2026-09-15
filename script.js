@@ -1,7 +1,6 @@
 const video = document.getElementById('camera');
 const stage = document.getElementById('stage');
 const creatureLayer = document.getElementById('creature-layer');
-const flipBtn = document.getElementById('flip-btn');
 const saveBtn = document.getElementById('save-btn');
 const permissionMsg = document.getElementById('permission-msg');
 const captionEl = document.getElementById('caption');
@@ -17,9 +16,34 @@ const CREATURE_FILES = [
 ];
 
 const CAPTIONS = [
-  'Hello there earthling! You have stumbled upon our garden of Moss. Rejoyce amidst the harmony of green.',
-  'Moss is an inconspicuous plant that might bridge the connection between the binding forces lying within our biology and our relationships to other organisms.',
-  'Salutations curious earthling!\n\nWe are the Moss protectors and our main dwellings are situated at Krater.\nDo visit us there to experience blissful togetherness among the greenery.'
+  {
+    text: 'You don’t ever exhaust the meaning of a poem or a painting or a piece of music, and this is another way of saying that the artwork is a sort of gate through which you can glimpse the unconditioned futurality that is a possibility condition for predictable futures. Art is maybe one tiny corner in our highly (too highly) consciously designed – and way too utilitarian – social space where we allow things to do that to us. What would it look like if we allowed more and more things to have some kind of power over us? This isn’t quite the same thing as saying, along with the socialist William Morris, that functional things should be beautiful. That’s because, on this view, things are just lumps without some nice decoration. But we’re saying that there are no lumps. There are blocks of ice, humans, sunlight, the Panthéon, polar bears. The goal is not to take existing things such as sofas and houses and make them pretty in a way that working-class people can afford (for example). That kind of thing suffers from the same syndrome as sustainability: it’s anthropocentrically scaled.',
+    attribution: '— Timothy Morton, All Art is Ecological'
+  },
+  {
+    text: 'An artwork does something to you, so if you think that only lifeforms can do things to you, this is a weird and challenging fact. If you think on top of this that only humans are empowered with the magical ability to impose meaning and temporality on things, then you are in for a bigger shock, because as I’ve argued, art emits time, which tells you something about how everything emits time. It’s designing your future as much as you’re designing its.',
+    attribution: '— Timothy Morton, All Art is Ecological'
+  },
+  {
+    text: 'Realizing that there are lots of different temporality formats is basically what ecological awareness is. It’s equivalent to acknowledging in a deep way the existence of beings that aren’t you, with whom you coexist. Once you’ve done that, you can’t un-acknowledge it. There’s no going back.',
+    attribution: '— Timothy Morton, All Art is Ecological'
+  },
+  {
+    text: 'I would like to see us use our technical skills to cure the ills of the Earth as well as those of humans.',
+    attribution: '— James Lovelock, We Belong to Gaia'
+  },
+  {
+    text: 'The time has come when all of us must plan a retreat from the unsustainable place that we have now reached through the inappropriate use of technology;',
+    attribution: '— James Lovelock, We Belong to Gaia'
+  },
+  {
+    text: 'I have long thought that a proper gift for our children and grandchildren is an accurate record of all we know about the present and past environment.',
+    attribution: '— James Lovelock, We Belong to Gaia'
+  },
+  {
+    text: 'Scan the shelves of a bookshop or a public library for a book that clearly explains the present condition and how it happened. You will not find it.',
+    attribution: '— James Lovelock, We Belong to Gaia'
+  }
 ];
 
 const CREATURE_COUNT = 3;
@@ -34,12 +58,12 @@ const KEY_H = 216;
 const KEY_LOW = 14;
 const KEY_HIGH = 46;
 
-// Rough non-overlapping "slots" (% of stage) creatures get randomly jittered within,
-// keeping clear of the caption band at the bottom and the very top edge.
+// Rough non-overlapping "slots" (% of stage) creatures get randomly jittered within.
+// Spread wide since creatures are large — keeps clear of the caption band at the bottom.
 const SLOTS = [
-  { xMin: 12, xMax: 34, yMin: 20, yMax: 42 },
-  { xMin: 62, xMax: 88, yMin: 18, yMax: 40 },
-  { xMin: 30, xMax: 60, yMin: 50, yMax: 68 }
+  { xMin: 8, xMax: 28, yMin: 16, yMax: 30 },
+  { xMin: 72, xMax: 92, yMin: 16, yMax: 30 },
+  { xMin: 35, xMax: 65, yMin: 55, yMax: 68 }
 ];
 
 function pickRandom(arr) {
@@ -144,7 +168,17 @@ function bindDrag(instance) {
 function initCreatures() {
   const files = shuffled(CREATURE_FILES).slice(0, CREATURE_COUNT);
   files.forEach((file, i) => createCreature(file, SLOTS[i]));
-  captionEl.textContent = pickRandom(CAPTIONS);
+
+  const quote = pickRandom(CAPTIONS);
+  captionEl.innerHTML = '';
+  const textEl = document.createElement('p');
+  textEl.className = 'quote-text';
+  textEl.textContent = quote.text;
+  const attributionEl = document.createElement('p');
+  attributionEl.className = 'quote-attribution';
+  attributionEl.textContent = quote.attribution;
+  captionEl.appendChild(textEl);
+  captionEl.appendChild(attributionEl);
 }
 
 function chromaKeyLoop() {
@@ -167,7 +201,6 @@ function chromaKeyLoop() {
   requestAnimationFrame(chromaKeyLoop);
 }
 
-let facingMode = 'user';
 let currentStream = null;
 let requestId = 0; // guards against a stale in-flight call overwriting a newer result
 
@@ -192,8 +225,9 @@ async function startCamera() {
     return;
   }
   try {
+    // Always the back (environment) camera — no front-camera option.
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode, width: { ideal: 1280 }, height: { ideal: 1280 } },
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
       audio: false
     });
     if (myRequest !== requestId) {
@@ -203,7 +237,6 @@ async function startCamera() {
     }
     currentStream = stream;
     video.srcObject = currentStream;
-    video.classList.toggle('mirror', facingMode === 'user');
     permissionMsg.hidden = true;
   } catch (err) {
     console.error('Camera error:', err.name, err.message);
@@ -211,7 +244,7 @@ async function startCamera() {
       NotAllowedError: 'Dostop do kamere je zavrnjen. Klikni na ključavnico/ikono ob naslovu strani, dovoli kamero, nato osveži.',
       NotFoundError: 'Ni najdene kamere na tej napravi.',
       NotReadableError: 'Kamero uporablja druga aplikacija ali zavihek — zapri jo in poskusi znova.',
-      OverconstrainedError: 'Zahtevana kamera (' + facingMode + ') ni na voljo na tej napravi.',
+      OverconstrainedError: 'Zadnja kamera ni na voljo na tej napravi.',
       SecurityError: 'Dostop do kamere je blokiran zaradi varnostnih nastavitev strani (npr. vgrajen predogled brez dovoljenja za kamero).'
     };
     showError(messages[err.name] || `Napaka pri dostopu do kamere: ${err.name} — ${err.message}`, myRequest);
@@ -226,13 +259,8 @@ function showError(text, forRequest) {
 
 document.getElementById('retry-btn').addEventListener('click', startCamera);
 
-flipBtn.addEventListener('click', () => {
-  facingMode = facingMode === 'user' ? 'environment' : 'user';
-  startCamera();
-});
-
-// Save composited snapshot
-saveBtn.addEventListener('click', () => {
+// Composite the camera frame + all creatures into one snapshot, then share or download it
+function renderSnapshot() {
   const canvas = document.getElementById('capture-canvas');
   const vw = video.videoWidth || 720;
   const vh = video.videoHeight || 1280;
@@ -240,13 +268,7 @@ saveBtn.addEventListener('click', () => {
   canvas.height = vh;
   const ctx = canvas.getContext('2d');
 
-  ctx.save();
-  if (video.classList.contains('mirror')) {
-    ctx.translate(vw, 0);
-    ctx.scale(-1, 1);
-  }
   ctx.drawImage(video, 0, 0, vw, vh);
-  ctx.restore();
 
   // Map each creature's on-screen position/size (relative to stage) onto the output canvas
   const stageRect = stage.getBoundingClientRect();
@@ -262,16 +284,36 @@ saveBtn.addEventListener('click', () => {
     ctx.drawImage(instance.canvas, drawX, drawY, drawW, drawH);
   }
 
-  canvas.toBlob((blob) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bitje-${Date.now()}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, 'image/png');
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+function downloadBlob(blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bitje-${Date.now()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+saveBtn.addEventListener('click', async () => {
+  const blob = await renderSnapshot();
+  const file = new File([blob], `bitje-${Date.now()}.png`, { type: 'image/png' });
+
+  // Prefer the native share sheet (Instagram Stories, Messages, AirDrop, …) where supported;
+  // fall back to a plain download everywhere else (most desktop browsers).
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // user cancelled the share sheet
+      // fall through to download on any other failure
+    }
+  }
+  downloadBlob(blob);
 });
 
 initCreatures();

@@ -29,10 +29,6 @@ html, body {
   background: #111;
 }
 
-#camera.mirror {
-  transform: scaleX(-1);
-}
-
 #creature-layer {
   position: absolute;
   inset: 0;
@@ -41,7 +37,7 @@ html, body {
 .creature {
   position: absolute;
   /* scales with the viewport so it reads at the same relative size on any screen */
-  width: min(38vw, 34vh);
+  width: min(58vw, 50vh);
   height: auto;
   transform: translate(-50%, -50%);
   cursor: grab;
@@ -105,18 +101,37 @@ html, body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 96px;
-  max-height: 30dvh;
-  overflow: hidden;
+  bottom: 90px;
+  max-height: 34dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   text-align: center;
+  padding: 10px 28px;
+  pointer-events: auto;
+}
+
+#caption::-webkit-scrollbar {
+  display: none;
+}
+
+#caption .quote-text {
+  margin: 0;
   color: #fff;
-  font-size: 15px;
-  line-height: 1.45;
-  font-weight: 600;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
-  padding: 0 24px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
   white-space: pre-line;
-  pointer-events: none;
+}
+
+#caption .quote-attribution {
+  margin: 8px 0 0;
+  color: rgba(255,255,255,0.75);
+  font-size: 12px;
+  font-style: italic;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.7);
 }
 
 #controls {
@@ -132,21 +147,20 @@ html, body {
   background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0));
 }
 
-#flip-btn, #save-btn {
+#save-btn {
   flex: 0 0 auto;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: none;
   background: rgba(255,255,255,0.92);
   color: #111;
-  font-size: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-#flip-btn:active, #save-btn:active {
+#save-btn:active {
   background: #fff;
   transform: scale(0.95);
 }
