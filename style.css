@@ -1,0 +1,152 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+#stage {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#camera {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #111;
+}
+
+#camera.mirror {
+  transform: scaleX(-1);
+}
+
+#creature-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.creature {
+  position: absolute;
+  /* scales with the viewport so it reads at the same relative size on any screen */
+  width: min(38vw, 34vh);
+  height: auto;
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.35));
+}
+
+.creature:active {
+  cursor: grabbing;
+}
+
+.creature-source {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#permission-msg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  color: #fff;
+  background: rgba(0,0,0,0.75);
+  z-index: 5;
+}
+
+#permission-msg[hidden] {
+  display: none;
+}
+
+#permission-msg p {
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+#retry-btn {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 24px;
+  background: #fff;
+  color: #111;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#retry-btn:active {
+  background: #ddd;
+}
+
+#caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 96px;
+  max-height: 30dvh;
+  overflow: hidden;
+  text-align: center;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1.45;
+  font-weight: 600;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  padding: 0 24px;
+  white-space: pre-line;
+  pointer-events: none;
+}
+
+#controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0));
+}
+
+#flip-btn, #save-btn {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.92);
+  color: #111;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#flip-btn:active, #save-btn:active {
+  background: #fff;
+  transform: scale(0.95);
+}

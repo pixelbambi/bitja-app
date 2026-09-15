@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <g>
+    <animateTransform attributeName="transform" type="translate" values="0 0; 0 -8; 0 0" dur="1.4s" repeatCount="indefinite"/>
+    <ellipse cx="100" cy="120" rx="60" ry="50" fill="#7c5cff"/>
+    <circle cx="80" cy="105" r="10" fill="#fff"/>
+    <circle cx="120" cy="105" r="10" fill="#fff"/>
+    <circle cx="80" cy="105" r="4" fill="#111">
+      <animate attributeName="ry" values="4;0.5;4" dur="2.6s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="120" cy="105" r="4" fill="#111">
+      <animate attributeName="ry" values="4;0.5;4" dur="2.6s" repeatCount="indefinite"/>
+    </circle>
+    <path d="M85 130 Q100 140 115 130" stroke="#111" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="60" cy="130" rx="10" ry="6" fill="#ff8fd6" opacity="0.7"/>
+    <ellipse cx="140" cy="130" rx="10" ry="6" fill="#ff8fd6" opacity="0.7"/>
+  </g>
+</svg>

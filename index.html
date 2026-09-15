@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>bitja — spletni AR filter</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="stage">
+  <video id="camera" autoplay playsinline muted></video>
+
+  <!-- creature canvases + hidden source videos are injected here by script.js -->
+  <div id="creature-layer"></div>
+
+  <div id="permission-msg" hidden>
+    <p>Za AR filter potrebujem dostop do kamere. Preveri dovoljenja brskalnika in osveži stran.</p>
+    <button id="retry-btn">Poskusi znova</button>
+  </div>
+
+  <div id="caption"></div>
+
+  <div id="controls">
+    <button id="flip-btn" title="Zamenjaj kamero">⟲</button>
+    <button id="save-btn" title="Shrani sliko">⬇</button>
+  </div>
+</div>
+
+<canvas id="capture-canvas" hidden></canvas>
+
+<script src="script.js"></script>
+</body>
+</html>
