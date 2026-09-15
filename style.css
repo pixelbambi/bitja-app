@@ -32,6 +32,7 @@ html, body {
 #creature-layer {
   position: absolute;
   inset: 0;
+  z-index: 3;
 }
 
 .creature {
@@ -102,6 +103,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: 90px;
+  z-index: 2;
   max-height: 40dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -139,6 +141,7 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
